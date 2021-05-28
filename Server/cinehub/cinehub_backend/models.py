@@ -33,12 +33,11 @@ class Hall(models.Model):
 
 
 
-class Running_movies(models.Model):
+class Running_movie(models.Model):
     running_id = models.AutoField(primary_key=True)
     date = models.CharField(max_length = 12)
     time = models.CharField(max_length = 5)
-    occupied_seats = models.PositiveIntegerField(default=0)
-
+    occupied_seats = models.CharField(max_length=300, default="")
     class Meta:
         constraints = [
             models.UniqueConstraint(
@@ -53,7 +52,7 @@ class Running_movies(models.Model):
     hall = models.ForeignKey(Hall, on_delete=models.CASCADE)
 
     def __str__(self):
-        return self.running_id + " " + self.date +  " " + self.time + " " + self.occupied_seats + " " + self.movie + " " + self.hall
+        return self.running_id + " " + self.date +  " " + self.time + " " + self.movie + " " + self.hall
     
 
 
@@ -61,7 +60,22 @@ class Booking (models.Model):
     booking_id = models.AutoField(primary_key=True)
     seats = models.CharField(max_length = 200)
     user_id = models.CharField(max_length = 30)
-    running = models.ForeignKey(Running_movies, on_delete=models.CASCADE)
+    running = models.ForeignKey(Running_movie, on_delete=models.CASCADE)
     
     def __str__(self):
         return self.booking_id + " " + self.seats + " " + self.user_id  + " " + self.running 
+
+
+# class Reserved_Seat (models.Model):
+#     reserved_seat = models.AutoField(primary_key=True, default = 0)
+#     running = models.ForeignKey(Running_movie, on_delete=models.CASCADE)
+#     seat_number = models.PositiveIntegerField(default=0)
+
+#     class Meta:
+#         constraints = [
+#             models.UniqueConstraint(
+#                 fields=["running_id", "seat_number"], name="unique_reservation_seat"
+#             )]
+
+#     def __str__(self):
+#         return self.running + " " + self.seat_number
