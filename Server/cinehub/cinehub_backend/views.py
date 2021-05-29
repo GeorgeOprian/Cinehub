@@ -1,11 +1,15 @@
+from types import coroutine
+
+from django.db.models.fields import NullBooleanField
 from cinehub_backend.models import Booking, Movie
 from cinehub_backend.models import Running_movie
 # from cinehub_backend.models import Reserved_Seat
 from django.http.response import JsonResponse
 from django.shortcuts import render
 from django.http import HttpResponse, JsonResponse
+from django.db import connection
 import json
-import pprint
+from datetime import datetime
 # Create your views here.
 
 def home(request):
@@ -40,9 +44,29 @@ def get_movies(request): #basic get
 
 
 def get_bookings(request):
-    user_id = "CAAGM8TJqxeyz4qrTr8EWfjKvJw1"
-    queryset = Running_movie.objects.all().select_related('running_id').select_related('imdb_id')
-    print (queryset)
+    user_id = request.GET['user_id']
+    print("##############################")
+    print (user_id)
+    print("##############################")
+    # user_id = "CAAGM8TJqxeyz4qrTr8EWfjKvJw1"
+    cursor = connection.cursor()
+    cursor.execute('select booking_id, title, poster, date, time, seats, user_id  from cinehub_backend_booking b '
+                    + ' join cinehub_backend_running_movie r on b.running_id = r.running_id '
+                    + ' join cinehub_backend_movie m on r.movie_id = m.imdb_id '
+                    + ' where user_id = %s', [user_id])
+    res = dictfetchall(cursor)
+    
+    bookings = []
+    for result in res:
+        bookings.append(create_booking_dto(result))
+    
+    resp = {}
+    resp['ListOfBookings'] = bookings
+    print("##############################")
+    print (resp)
+    return JsonResponse(resp)
+    
+
 
 def add_movie(request): #basic post
     print("am primit un film")
@@ -78,17 +102,19 @@ def add_booking(request):
         booking_model = create_booking_model(received_json_data)
         booking_model.save()
     
-
-    
-    # Running_movie.objects.filter(running_id = received_json_data['RunningId']).update(occupied_seats = convert_list_of_seats_from_int_to_string(received_json_data['ReservedSeats']))
-
-    # running_movie = create_running_movie_for_booking(received_json_data)
-    # print(running_movie.occupied_seats)
-    # running_movie.save()
-    
     resp = {"resp":"booking added succesfully"} 
     return JsonResponse(resp, status = resp_code)
 
+def delete_movie(request):
+    
+    return NullBooleanField
+
+def dictfetchall(cursor):
+    columns = [col[0] for col in cursor.description]
+    return [
+        dict(zip(columns, row))
+        for row in cursor.fetchall()
+    ]
 
 def create_movie_model (rec_data):
     movie = Movie(
@@ -121,10 +147,13 @@ def create_running_movie_model(rec_data):
 
 
 def create_booking_model(rec_data):
+    now = datetime.now()
+    dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
     booking = Booking(
-        seats = str(rec_data['ReservedSeats']),
+        seats = convert_list_of_seats_from_int_to_string(rec_data['ReservedSeats']),
         user_id = rec_data['UserId'],
-        running_id = rec_data['RunningId']
+        running_id = rec_data['RunningId'],
+        date_time = dt_string
     )
 
     return booking
@@ -142,22 +171,9 @@ def update_running_movie_seats(rec_data):
             return resp_status
         running_movie.occupied_seats += " " + str(seat)
 
-
-
     print ("locuri ocupate", running_movie.occupied_seats)
     running_movie.save()
     return resp_status
-
-
-# def create_list_of_seats(rec_data):
-#     seat_numbers = rec_data['ReservedSeats']
-#     seat_models = []
-#     for seat in seat_numbers:
-#         seat_models.append(Reserved_Seat(
-#             running_id = rec_data['RunningId'],
-#             seat_number = seat
-#         ))
-#     return seat_models
 
 
 
@@ -208,6 +224,20 @@ def convert_list_of_seats_from_int_to_string(list_of_seats_int):
     string_ints = [str(seat) for seat in list_of_seats_int]
     list_of_seats_string = " ".join(string_ints)
     return list_of_seats_string
+
+
+def create_booking_dto (booking):
+    booking_dto = {}
+    booking_dto['BookingId'] = booking['booking_id']
+    booking_dto['MovieTitle'] = booking['title']
+    booking_dto['Poster'] = booking['poster']
+    booking_dto['RunningDate'] = booking['date']
+    booking_dto['RunningTime'] = booking['time']
+    booking_dto['ReservedSeats'] = convert_list_of_seats_from_string_to_int(booking['seats'])
+
+    
+    return booking_dto
+    
  
 # def select_seats_for_running (running):
 #     result = Reserved_Seat.objects.filter(running = running['running_id']).values()

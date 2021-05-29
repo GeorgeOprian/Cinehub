@@ -29,7 +29,7 @@ class Hall(models.Model):
     number_of_seats = models.PositiveIntegerField(default=0)
 
     def __str__(self):
-        return self.hall_id + " " + self.number_of_seats
+        return str(self.hall_id) + " " + str(self.number_of_seats)
 
 
 
@@ -52,7 +52,7 @@ class Running_movie(models.Model):
     hall = models.ForeignKey(Hall, on_delete=models.CASCADE)
 
     def __str__(self):
-        return self.running_id + " " + self.date +  " " + self.time + " " + self.movie + " " + self.hall
+        return str(self.running_id) + " " + self.date +  " " + self.time + " " + str(self.movie.__dict__) + " " + str(self.hall.__dict__)
     
 
 
@@ -61,9 +61,10 @@ class Booking (models.Model):
     seats = models.CharField(max_length = 200)
     user_id = models.CharField(max_length = 30)
     running = models.ForeignKey(Running_movie, on_delete=models.CASCADE)
+    date_time = models.CharField(max_length = 20, default = "")
     
     def __str__(self):
-        return self.booking_id + " " + self.seats + " " + self.user_id  + " " + self.running 
+        return str(self.booking_id) + " " + self.seats + " " + self.user_id  + " " + str(self.running .__dict__)
 
 
 # class Reserved_Seat (models.Model):
