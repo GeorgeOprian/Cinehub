@@ -12,6 +12,11 @@ import json
 from datetime import datetime
 # Create your views here.
 
+RESP_CODE_SUCCES = 200
+RESP_CODE_COULD_NOT_INSERT_IN_DB = 512
+RESP_CODE_BOOKINGS_LINKED_TO_MOVIE = 513
+RESP_CODE_MOVIE_NOT_FOUND = 514
+
 def home(request):
     return render(request, 'home.html', {'name' : "George"})
 
@@ -98,7 +103,7 @@ def add_booking(request):
     print("##############################")
 
     resp_code = update_running_movie_seats(received_json_data)
-    if resp_code == 200:
+    if resp_code == RESP_CODE_SUCCES:
         booking_model = create_booking_model(received_json_data)
         booking_model.save()
     
@@ -106,8 +111,31 @@ def add_booking(request):
     return JsonResponse(resp, status = resp_code)
 
 def delete_movie(request):
+    resp_code = RESP_CODE_SUCCES
+    movie_title = request.GET['movie_title']
+    print ("Filmul pe care doritit sa-l stergeti: ", movie_title)
+    movies = Movie.objects.all()
+    movies_to_be_deleted = []
+    movie_found = False
+    for movie in movies:
+        if movie_title.lower() in movie.title.lower():
+            movies_to_be_deleted.append(movie)
+            movie_found = True
     
-    return NullBooleanField
+    if not movie_found:
+        resp_code = RESP_CODE_MOVIE_NOT_FOUND #movie not found
+        return HttpResponse(status = resp_code)
+
+    for movie in movies_to_be_deleted:
+        runnings = Running_movie.objects.all().filter(movie_id = movie.imdb_id)
+        for running in runnings:
+            if len(running.occupied_seats) != 0:
+                resp_code = RESP_CODE_BOOKINGS_LINKED_TO_MOVIE
+                return HttpResponse(status = resp_code)
+
+    for movie in movies_to_be_deleted:
+        movie.delete()
+    return HttpResponse(status = resp_code)
 
 def dictfetchall(cursor):
     columns = [col[0] for col in cursor.description]
@@ -164,10 +192,10 @@ def update_running_movie_seats(rec_data):
     print ("seats_from_client", seats_from_client)
     print ("seats_from_bd", running_movie.occupied_seats)
 
-    resp_status = 200
+    resp_status = RESP_CODE_SUCCES
     for seat in seats_from_client:
         if str(seat) in running_movie.occupied_seats:
-            resp_status = 512
+            resp_status = RESP_CODE_COULD_NOT_INSERT_IN_DB
             return resp_status
         running_movie.occupied_seats += " " + str(seat)
 
