@@ -15,7 +15,7 @@ from datetime import datetime
 RESP_CODE_SUCCES = 200
 RESP_CODE_COULD_NOT_INSERT_IN_DB = 512
 RESP_CODE_BOOKINGS_LINKED_TO_MOVIE = 513
-RESP_CODE_MOVIE_NOT_FOUND = 514
+RESP_CODE_RESOURCE_NOT_FOUND = 204
 
 def home(request):
     return render(request, 'home.html', {'name' : "George"})
@@ -123,7 +123,8 @@ def delete_movie(request):
             movie_found = True
     
     if not movie_found:
-        resp_code = RESP_CODE_MOVIE_NOT_FOUND #movie not found
+        print ("fimul nu a fost gasit")
+        resp_code = RESP_CODE_RESOURCE_NOT_FOUND 
         return HttpResponse(status = resp_code)
 
     for movie in movies_to_be_deleted:
