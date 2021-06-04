@@ -47,6 +47,31 @@ def get_movies(request): #basic get
     print (resp)
     return JsonResponse(resp)
 
+def get_movies_by_title(request):
+    resp_code = RESP_CODE_SUCCES
+    movie_title = request.GET['movie_title']
+    print ("titlul filmului =" , movie_title)
+
+    movie_title = '%' + movie_title + '%'
+    print ("titlul filmului =" , movie_title)
+    cursor = connection.cursor()
+    cursor.execute('select * from cinehub_backend_movie m'
+                    + ' where lower(title) like %s', [movie_title.lower()])
+    res = dictfetchall(cursor)
+    if len(res) == 0:
+        return HttpResponse(status = RESP_CODE_RESOURCE_NOT_FOUND)
+    list_of_movies = []
+    print("##############################")
+    for result in res:
+        print (result)
+        print("##############################")
+        list_of_movies.append(create_movie_dto(result, None))
+    resp = {}
+    resp['ListOfMovies'] = list_of_movies
+    
+    print (resp)
+    return JsonResponse(resp)
+
 
 def get_bookings(request):
     user_id = request.GET['user_id']
@@ -110,16 +135,18 @@ def add_booking(request):
     resp = {"resp":"booking added succesfully"} 
     return JsonResponse(resp, status = resp_code)
 
+
+
 def delete_movie(request):
     resp_code = RESP_CODE_SUCCES
-    movie_title = request.GET['movie_title']
-    print ("Filmul pe care doritit sa-l stergeti: ", movie_title)
+    imdb_id = request.GET['imdb_id']
+    print ("Filmul pe care doritit sa-l stergeti: ", imdb_id)
     movies = Movie.objects.all()
-    movies_to_be_deleted = []
+    movie_to_be_deleted = None
     movie_found = False
     for movie in movies:
-        if movie_title.lower() in movie.title.lower():
-            movies_to_be_deleted.append(movie)
+        if imdb_id.lower().strip() in movie.imdb_id.lower():
+            movie_to_be_deleted = movie
             movie_found = True
     
     if not movie_found:
@@ -127,15 +154,14 @@ def delete_movie(request):
         resp_code = RESP_CODE_RESOURCE_NOT_FOUND 
         return HttpResponse(status = resp_code)
 
-    for movie in movies_to_be_deleted:
-        runnings = Running_movie.objects.all().filter(movie_id = movie.imdb_id)
-        for running in runnings:
-            if len(running.occupied_seats) != 0:
-                resp_code = RESP_CODE_BOOKINGS_LINKED_TO_MOVIE
-                return HttpResponse(status = resp_code)
+    runnings = Running_movie.objects.all().filter(movie_id = movie_to_be_deleted.imdb_id)
+    for running in runnings:
+        if len(running.occupied_seats) != 0:
+            resp_code = RESP_CODE_BOOKINGS_LINKED_TO_MOVIE
+            return HttpResponse(status = resp_code)
 
-    for movie in movies_to_be_deleted:
-        movie.delete()
+    movie_to_be_deleted.delete()
+
     return HttpResponse(status = resp_code)
 
 def dictfetchall(cursor):
@@ -223,12 +249,13 @@ def create_movie_dto(movie, running):
     movie_dto['Poster'] = movie['poster']
     movie_dto['imdbRating'] = movie['imdb_rating']
 
-    movie_dto['RunningId'] = running['running_id']
-    movie_dto['RunningDate'] = running['date']
-    movie_dto['RunningTime'] = running['time']
-    movie_dto['HallNumber'] = running['hall_id']
+    if running is not None:
+        movie_dto['RunningId'] = running['running_id']
+        movie_dto['RunningDate'] = running['date']
+        movie_dto['RunningTime'] = running['time']
+        movie_dto['HallNumber'] = running['hall_id']
 
-    movie_dto['OccupiedSeats'] = convert_list_of_seats_from_string_to_int(running['occupied_seats'])
+        movie_dto['OccupiedSeats'] = convert_list_of_seats_from_string_to_int(running['occupied_seats'])
 
     # movie_dto['OccupiedSeats'] = select_seats_for_running(running)
 
@@ -238,9 +265,6 @@ def convert_list_of_seats_from_string_to_int(list_of_seats_string):
     if list_of_seats_string == '':
         return []
     list_of_parsed_seats = list_of_seats_string.split(" ")
-
-    print ("list_of_seats_string = ", list_of_seats_string)
-    print ("list_of_parsed_seats = ", list_of_parsed_seats)
     list_of_seats_ints = []    
     for seat in list_of_parsed_seats:
         if seat != "":

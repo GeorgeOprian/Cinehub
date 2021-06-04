@@ -13,7 +13,7 @@ class Movie (models.Model):
     writer = models.CharField(max_length = 500)
     actors = models.CharField(max_length = 200)
     plot = models.CharField(max_length = 500)
-    language = models.CharField(max_length = 50)
+    language = models.CharField(max_length = 100)
     awards = models.CharField(max_length = 200)
     poster = models.CharField(max_length = 300)
     # ratings = models.CharField(max_length = 500) # adaug mai tarziu rating urile
