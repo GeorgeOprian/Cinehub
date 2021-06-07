@@ -17,20 +17,6 @@ RESP_CODE_COULD_NOT_INSERT_IN_DB = 512
 RESP_CODE_BOOKINGS_LINKED_TO_MOVIE = 513
 RESP_CODE_RESOURCE_NOT_FOUND = 204
 
-def home(request):
-    return render(request, 'home.html', {'name' : "George"})
-
-def add(request):
-
-    val1 = int(request.POST['num1'])
-    val2 = int(request.POST['num2'])
-
-    res = val1 + val2
-
-    return render(request, 'result.html', {'result': res})
-
-
-
 #merge cu obiect de return in java
 def get_movies(request): #basic get
     print ("Am primit un get ")
@@ -135,7 +121,10 @@ def add_booking(request):
     resp = {"resp":"booking added succesfully"} 
     return JsonResponse(resp, status = resp_code)
 
+def update_movie():
 
+    resp = []
+    return HttpResponse(resp)
 
 def delete_movie(request):
     resp_code = RESP_CODE_SUCCES
@@ -290,19 +279,3 @@ def create_booking_dto (booking):
 
     
     return booking_dto
-    
- 
-# def select_seats_for_running (running):
-#     result = Reserved_Seat.objects.filter(running = running['running_id']).values()
-#     result_list = list(result)
-
-#     list_of_seats = []
-#     for seat_obj in result_list:
-#         list_of_seats.append(seat_obj['seat_number'])
-    
-#     return list_of_seats
-
-#objects to be used by the data base
-
-
-
