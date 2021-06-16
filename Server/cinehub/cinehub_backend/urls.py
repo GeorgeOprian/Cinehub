@@ -7,5 +7,6 @@ urlpatterns = [
     path('add_movie',views.add_movie, name='add_movie'),
     path('add_booking',views.add_booking, name='add_booking'),
     path('update_movie',views.update_movie, name='update_movie'),
-    path('delete_movie',views.delete_movie, name='delete_movie')
+    path('delete_movie',views.delete_movie, name='delete_movie'),
+    path('update_movie',views.update_movie, name='update_movie')
 ]

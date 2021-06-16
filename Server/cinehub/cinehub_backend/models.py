@@ -41,7 +41,7 @@ class Running_movie(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["movie_id", "hall_id"], name="unique_movie_hall"
+                fields=["running_id","movie_id", "hall_id"], name="unique_movie_hall"
             ), 
             models.UniqueConstraint(
                 fields=["date", "time", "hall_id"], name="unique_movie_date_time"

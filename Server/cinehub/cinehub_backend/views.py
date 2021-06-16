@@ -9,13 +9,17 @@ from django.shortcuts import render
 from django.http import HttpResponse, JsonResponse
 from django.db import connection
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
+
 # Create your views here.
 
 RESP_CODE_SUCCES = 200
 RESP_CODE_COULD_NOT_INSERT_IN_DB = 512
 RESP_CODE_BOOKINGS_LINKED_TO_MOVIE = 513
 RESP_CODE_RESOURCE_NOT_FOUND = 204
+
+#time checks
+PAUSE_BETWEEN_MOVIES = 15
 
 #merge cu obiect de return in java
 def get_movies(request): #basic get
@@ -49,9 +53,16 @@ def get_movies_by_title(request):
     list_of_movies = []
     print("##############################")
     for result in res:
-        print (result)
+        
+        cursor.execute('select * from cinehub_backend_running_movie'
+                    + ' where movie_id like %s', [result['imdb_id']])
+        associated_runnings = dictfetchall(cursor)
+
+        print ("Associated running:", associated_runnings)
         print("##############################")
-        list_of_movies.append(create_movie_dto(result, None))
+        for running in associated_runnings:
+            list_of_movies.append(create_movie_dto(result, running))
+
     resp = {}
     resp['ListOfMovies'] = list_of_movies
     
@@ -82,9 +93,15 @@ def get_bookings(request):
     print (resp)
     return JsonResponse(resp)
     
-
+def load_movies_that_run_on_same_date(date, hall_id):
+    cursor = connection.cursor()
+    cursor.execute('select * from cinehub_backend_running_movie '
+                    + ' where date = %s and hall_id = %s ', [date, hall_id])
+    res = dictfetchall(cursor)
+    return res
 
 def add_movie(request): #basic post
+    resp_code = RESP_CODE_SUCCES
     print("am primit un film")
     received_json_data = json.loads(request.body)
     
@@ -94,16 +111,54 @@ def add_movie(request): #basic post
     print("##############################")
     print ("Movie received: ", movie_model.__dict__)
     print("##############################")
-    running_movie_model = create_running_movie_model(received_json_data)
+    running_to_insert = create_running_movie_model(received_json_data)
     
-    movie_model.save()
-    running_movie_model.save()
+    running_in_the_same_day = load_movies_that_run_on_same_date(running_to_insert.date, running_to_insert.hall_id)
+
+    if len(running_in_the_same_day) > 0:
+        
+        if can_add_movie_with_running_date_problems(running_to_insert, running_in_the_same_day):
+            movie_model.save()
+            running_to_insert.save()
+        else:
+            print ("There is another movie that runs at the same date and time")
+            resp_code = RESP_CODE_COULD_NOT_INSERT_IN_DB
+    else:
+        movie_model.save()
+        running_to_insert.save()
     
-    with open('Movie.json', 'w') as outfile:
-        json.dump(received_json_data, outfile)
-    print (received_json_data)
+   
     resp = {"resp":"movie added succesfully"} 
-    return JsonResponse(resp)
+    return JsonResponse(resp, status = resp_code)
+
+def can_add_movie_with_running_date_problems(running_to_insert, running_in_the_same_day):   
+    print("##############################")
+    print("filme care ruleaza in aceeasi zi: ", running_in_the_same_day)
+    print("##############################")
+
+
+    print("##############################")
+
+    
+    insert_movie = False
+    for running_movie in running_in_the_same_day:
+        cursor = connection.cursor()
+        cursor.execute('select duration from cinehub_backend_movie '
+                        + ' where cinehub_backend_movie.imdb_id = %s', [running_movie['movie_id']])
+        duration_dict = dictfetchall(cursor)
+        print ("timp film de inserat  ", running_to_insert.time)
+        print ("timp film din bd  ", running_movie['time'])
+        print ("durata film din bd = ", duration_dict[0]['duration'])
+        if can_movie_be_inserted(running_movie['time'], running_to_insert.time, duration_dict[0]['duration']):
+            print ("timp film de inserat  ", running_to_insert.time)
+            print ("timp film din bd  ", running_movie['time'])
+
+            # movie_model.save()
+            # running_to_insert.save()
+            insert_movie = True
+        print("##############################")
+
+    return insert_movie
 
 def add_booking(request):
     print("am primit o rezervare")
@@ -179,8 +234,7 @@ def create_movie_model (rec_data):
     return movie
 
 def create_running_movie_model(rec_data):
-    print ("in create_running_movie_model ")
-    print(rec_data)
+  
     running_movie = Running_movie(
                         date = rec_data['RunningDate'],
                         time = rec_data['RunningTime'],
@@ -219,8 +273,6 @@ def update_running_movie_seats(rec_data):
     running_movie.save()
     return resp_status
 
-
-
 #objects to be sent to the client
 def create_movie_dto(movie, running):
     movie_dto = {}
@@ -247,7 +299,6 @@ def create_movie_dto(movie, running):
         movie_dto['OccupiedSeats'] = convert_list_of_seats_from_string_to_int(running['occupied_seats'])
 
     # movie_dto['OccupiedSeats'] = select_seats_for_running(running)
-
     return movie_dto
 
 def convert_list_of_seats_from_string_to_int(list_of_seats_string):
@@ -267,7 +318,6 @@ def convert_list_of_seats_from_int_to_string(list_of_seats_int):
     list_of_seats_string = " ".join(string_ints)
     return list_of_seats_string
 
-
 def create_booking_dto (booking):
     booking_dto = {}
     booking_dto['BookingId'] = booking['booking_id']
@@ -276,6 +326,44 @@ def create_booking_dto (booking):
     booking_dto['RunningDate'] = booking['date']
     booking_dto['RunningTime'] = booking['time']
     booking_dto['ReservedSeats'] = convert_list_of_seats_from_string_to_int(booking['seats'])
-
-    
     return booking_dto
+
+
+
+
+#############
+#time checks
+def can_movie_be_inserted(movie_to_insert_hour, movie_from_db, duration_string):
+    t1_extended = add_duration_to_running_hour(movie_to_insert_hour, duration_string, PAUSE_BETWEEN_MOVIES)
+
+    # t1 = convert_string_time_to_object(t1_extended)
+    t2 = convert_string_time_to_object(movie_from_db)
+    print("t1_extended = ", t1_extended)
+    print("t2 = ", t2)
+
+    if t1_extended < t2:
+        return True
+    else:
+        return False
+
+
+def convert_string_time_to_object(string_time):
+    return datetime.strptime(string_time, '%H:%M')
+
+def convert_time_to_formated_string(time):
+    return time.strftime('%H:%M')
+
+
+def add_duration_to_running_hour(running_hour_string, duration_string, pause_time):
+    running_hour = convert_string_time_to_object(running_hour_string)
+    print ("ora = ", running_hour)
+    print ("ora = ", type(running_hour))
+
+    duration_int = int(duration_string.split()[0])
+
+    print("durata = ", duration_int)
+
+    extended_hour = (running_hour + timedelta(minutes = (duration_int + pause_time)))
+    return extended_hour
+
+
