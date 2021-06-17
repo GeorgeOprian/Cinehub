@@ -127,7 +127,6 @@ def add_movie(request): #basic post
         movie_model.save()
         running_to_insert.save()
     
-   
     resp = {"resp":"movie added succesfully"} 
     return JsonResponse(resp, status = resp_code)
 
@@ -149,7 +148,7 @@ def can_add_movie_with_running_date_problems(running_to_insert, running_in_the_s
         print ("timp film de inserat  ", running_to_insert.time)
         print ("timp film din bd  ", running_movie['time'])
         print ("durata film din bd = ", duration_dict[0]['duration'])
-        if can_movie_be_inserted(running_movie['time'], running_to_insert.time, duration_dict[0]['duration']):
+        if can_movie_be_inserted_or_updated(running_movie['time'], running_to_insert.time, duration_dict[0]['duration']):
             print ("timp film de inserat  ", running_to_insert.time)
             print ("timp film din bd  ", running_movie['time'])
 
@@ -176,15 +175,38 @@ def add_booking(request):
     resp = {"resp":"booking added succesfully"} 
     return JsonResponse(resp, status = resp_code)
 
-def update_movie():
+def update_movie(request):
+    resp_code = RESP_CODE_SUCCES
+    print("am primit o rulare de actualizat")
+    running_dto = json.loads(request.body)
+    print("##############################")
+    print ("Am primit rularea: ", running_dto)
+    print("##############################")
 
-    resp = []
-    return HttpResponse(resp)
+    running_model = create_running_movie_model(running_dto)
+    running_model.running_id = running_dto['RunningId']
+    
+    running_in_the_same_day = load_movies_that_run_on_same_date(running_model.date, running_model.hall_id)
+
+    if len(running_in_the_same_day) > 0:
+        
+        if can_add_movie_with_running_date_problems(running_model, running_in_the_same_day):
+            print ("Am actualizat filmul")
+            running_model.save()
+        else:
+            print ("There is another movie that runs at the same date and time")
+            resp_code = RESP_CODE_COULD_NOT_INSERT_IN_DB
+    else:
+        print ("Am actualizat filmul")
+        running_model.save()
+    
+    resp = {"resp":"movie added succesfully"} 
+    return JsonResponse(resp, status = resp_code)
 
 def delete_movie(request):
     resp_code = RESP_CODE_SUCCES
     imdb_id = request.GET['imdb_id']
-    print ("Filmul pe care doritit sa-l stergeti: ", imdb_id)
+    print ("Filmul pe care doriti sa-l stergeti: ", imdb_id)
     movies = Movie.objects.all()
     movie_to_be_deleted = None
     movie_found = False
@@ -207,6 +229,17 @@ def delete_movie(request):
     movie_to_be_deleted.delete()
 
     return HttpResponse(status = resp_code)
+
+def delete_booking(request):
+    resp_code = RESP_CODE_SUCCES
+    booking_id_from_client = request.GET['booking_id']
+    print ("Rezervarea pe care doriti sa o stergeti: ", booking_id_from_client)
+    booking_to_delete = Booking.objects.all().filter(booking_id = booking_id_from_client)
+    
+    booking_to_delete.delete()
+    
+    return HttpResponse(status = resp_code)
+
 
 def dictfetchall(cursor):
     columns = [col[0] for col in cursor.description]
@@ -333,7 +366,7 @@ def create_booking_dto (booking):
 
 #############
 #time checks
-def can_movie_be_inserted(movie_to_insert_hour, movie_from_db, duration_string):
+def can_movie_be_inserted_or_updated(movie_to_insert_hour, movie_from_db, duration_string):
     t1_extended = add_duration_to_running_hour(movie_to_insert_hour, duration_string, PAUSE_BETWEEN_MOVIES)
 
     # t1 = convert_string_time_to_object(t1_extended)
