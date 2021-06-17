@@ -77,10 +77,10 @@ def get_bookings(request):
     print("##############################")
     # user_id = "CAAGM8TJqxeyz4qrTr8EWfjKvJw1"
     cursor = connection.cursor()
-    cursor.execute('select booking_id, title, poster, date, time, seats, user_id  from cinehub_backend_booking b '
+    cursor.execute('select booking_id, title, poster, date, time, seats, user_id, hall_id  from cinehub_backend_booking b '
                     + ' join cinehub_backend_running_movie r on b.running_id = r.running_id '
                     + ' join cinehub_backend_movie m on r.movie_id = m.imdb_id '
-                    + ' where user_id = %s', [user_id])
+                    + ' where user_id = %s order by date desc', [user_id])
     res = dictfetchall(cursor)
     
     bookings = []
@@ -237,7 +237,7 @@ def delete_booking(request):
     booking_to_delete = Booking.objects.all().filter(booking_id = booking_id_from_client)
     
     booking_to_delete.delete()
-    
+
     return HttpResponse(status = resp_code)
 
 
@@ -352,6 +352,7 @@ def convert_list_of_seats_from_int_to_string(list_of_seats_int):
     return list_of_seats_string
 
 def create_booking_dto (booking):
+    print ("booking = ", booking)
     booking_dto = {}
     booking_dto['BookingId'] = booking['booking_id']
     booking_dto['MovieTitle'] = booking['title']
@@ -359,6 +360,7 @@ def create_booking_dto (booking):
     booking_dto['RunningDate'] = booking['date']
     booking_dto['RunningTime'] = booking['time']
     booking_dto['ReservedSeats'] = convert_list_of_seats_from_string_to_int(booking['seats'])
+    booking_dto['HallNumber'] = booking['hall_id']
     return booking_dto
 
 
